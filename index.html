@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Memories AI 回憶影片製作器</title>
+<meta name="description" content="AI 智慧回憶影片製作器 — 上傳照片，AI 自動分析場合、產生標題文字、選擇最佳風格。支持婚禮、追思、生日、畢業等重要場合。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Sans+TC:wght@300;400;500;700&family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Dancing+Script:wght@400;700&family=Quicksand:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-logo">✦ <span class="accent">Memories</span> <span style="font-size:.6em;color:var(--purple);font-family:system-ui">AI</span></div>
+  <div class="topbar-r">
+    <button class="btn btn-sm" onclick="undo()" data-tip="復原 (Ctrl+Z)">↩</button>
+    <button class="btn btn-sm" onclick="openSettings()" data-tip="設定">⚙️</button>
+    <button class="btn btn-ai btn-sm" id="aiBtn" onclick="runAI()" style="display:none" disabled data-tip="AI 自動分析並製作影片">🤖 AI 製作</button>
+    <button class="btn btn-gold btn-sm" onclick="startExport()" data-tip="匯出影片">⬇ 匯出</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main" id="main">
+<div class="center-col">
+
+  <!-- Preview Area -->
+  <div class="preview" id="preview">
+    <canvas id="cvs" width="1280" height="720"></canvas>
+
+    <!-- Onboarding (3-Step Guide) -->
+    <div class="onboard" id="onboard">
+      <div class="ob-icon">🤖</div>
+      <h2>AI 幫您製作回憶影片</h2>
+      <p>只需上傳照片或影片，AI 自動判斷場合、產生標題文字、選擇最佳風格。適用於婚禮、追思、生日、畢業等重要場合。</p>
+      <div class="ob-steps">
+        <div class="ob-step active">
+          <div class="ob-step-num">1</div>
+          <div class="ob-step-label">上傳照片</div>
+        </div>
+        <div class="ob-step">
+          <div class="ob-step-num">2</div>
+          <div class="ob-step-label">AI 分析</div>
+        </div>
+        <div class="ob-step">
+          <div class="ob-step-num">3</div>
+          <div class="ob-step-label">匯出影片</div>
+        </div>
+      </div>
+      <div style="margin-top:18px">
+        <label class="file-label as-ai-btn">📁 選擇照片 / 影片<input type="file" multiple accept="image/*,video/*" onchange="handleMedia(this.files);this.value=''"></label>
+      </div>
+      <div class="ob-formats">支援 JPG、PNG、GIF、MP4、MOV、WEBM</div>
+    </div>
+
+    <div class="slide-counter" id="slideCtr" style="display:none"></div>
+    <button class="fs-btn" onclick="toggleFS()" data-tip="全螢幕">⛶</button>
+  </div>
+
+  <!-- Hidden Media Container -->
+  <div class="hidden-media" id="hiddenMedia"></div>
+
+  <!-- Playback Controls -->
+  <div class="ctrl">
+    <button class="ctrl-sm" onclick="prevSlide()" data-tip="上一張">⏮</button>
+    <button class="ctrl-play" id="playBtn" onclick="togglePlay()" data-tip="播放/暫停 (空白鍵)">
+      <svg viewBox="0 0 24 24" id="playIco"><polygon points="6,3 20,12 6,21"/></svg>
+    </button>
+    <button class="ctrl-sm" onclick="nextSlide()" data-tip="下一張">⏭</button>
+    <button class="ctrl-sm" id="loopBtn" onclick="toggleLoop()" style="font-size:.75em;opacity:.5" data-tip="循環播放">🔁</button>
+    <div class="prog-wrap" id="progWrap"><div class="prog-bg"><div class="prog-fill" id="progFill"></div></div></div>
+    <div class="time-lbl" id="timeLbl">0:00 / 0:00</div>
+    <button class="ctrl-sm" id="muteBtn" onclick="toggleMute()" style="font-size:.85em" data-tip="靜音">🔊</button>
+  </div>
+
+  <!-- Timeline -->
+  <div class="tl-wrap">
+    <div class="tl-scroll" id="tls">
+      <label class="tl-add-label" data-tip="新增媒體">＋<input type="file" multiple accept="image/*,video/*" onchange="handleMedia(this.files);this.value=''"></label>
+    </div>
+  </div>
+
+</div>
+
+<!-- Desktop Side Panel -->
+<div class="side" id="side">
+  <div class="side-tabs">
+    <button class="side-tab active" data-p="ai" onclick="sideGo('ai')">🤖 AI</button>
+    <button class="side-tab" data-p="media" onclick="sideGo('media')">📁 媒體</button>
+    <button class="side-tab" data-p="style" onclick="sideGo('style')">🎨 風格</button>
+    <button class="side-tab" data-p="text" onclick="sideGo('text')">✏️ 文字</button>
+    <button class="side-tab" data-p="music" onclick="sideGo('music')">🎵 音樂</button>
+    <button class="side-tab" data-p="export" onclick="sideGo('export')">⬇ 匯出</button>
+  </div>
+  <div class="side-body" id="sideBody"></div>
+</div>
+
+<!-- Mobile Drawer -->
+<div class="drawer-bg" id="dBg" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-hd">
+    <div class="drawer-title" id="dTitle"></div>
+    <button class="drawer-x" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="dBody"></div>
+</div>
+</div>
+
+<!-- Mobile Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn" data-p="ai" onclick="openDrawer('ai')"><span class="ti">🤖</span>AI</button>
+  <button class="tab-btn" data-p="media" onclick="openDrawer('media')"><span class="ti">📁</span>媒體</button>
+  <button class="tab-btn" data-p="style" onclick="openDrawer('style')"><span class="ti">🎨</span>風格</button>
+  <button class="tab-btn" data-p="text" onclick="openDrawer('text')"><span class="ti">✏️</span>文字</button>
+  <button class="tab-btn" data-p="music" onclick="openDrawer('music')"><span class="ti">🎵</span>音樂</button>
+  <button class="tab-btn" data-p="export" onclick="openDrawer('export')"><span class="ti">⬇</span>匯出</button>
+</div>
+
+<!-- AI Analysis Overlay -->
+<div class="ai-overlay" id="aiOv">
+  <div class="ai-spinner"></div>
+  <div class="ai-title" id="aiOvTitle">AI 正在分析...</div>
+  <div class="ai-step" id="aiStep">準備中</div>
+  <div class="ai-progress"><div class="ai-progress-fill" id="aiProg"></div></div>
+  <button class="btn" onclick="cancelAI()" style="margin-top:8px">取消</button>
+</div>
+
+<!-- Export Overlay -->
+<div class="eo" id="eo">
+  <div class="eo-t">正在匯出影片...</div>
+  <div class="eo-s" id="eoS">準備中</div>
+  <div class="eo-bar"><div class="eo-fill" id="eoF"></div></div>
+  <button class="btn" onclick="cancelExport()" style="margin-top:8px">取消</button>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-bg" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3>⚙️ 設定</h3>
+      <button class="modal-x" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="key-status">
+      <div class="key-dot no" id="keyDot"></div>
+      <span style="font-size:.82em;color:var(--txt2)">API Key 狀態：</span>
+      <span style="font-size:.82em;color:var(--gold-l)" id="keyStatusText">未設定</span>
+    </div>
+    <div class="fg">
+      <label class="fl">Anthropic API Key</label>
+      <input class="fi" id="apiKeyInput" type="password" placeholder="sk-ant-api03-...">
+    </div>
+    <p class="fl" style="line-height:1.5;margin-bottom:12px">
+      請到 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--purple);text-decoration:underline">Anthropic Console</a> 取得 API Key。<br>
+      Key 僅儲存在您的瀏覽器本地，不會上傳至任何伺服器。
+    </p>
+    <div class="fr" style="gap:8px">
+      <button class="btn btn-ai" onclick="saveApiKey()">💾 儲存</button>
+      <button class="btn" id="testKeyBtn" onclick="testApiKey()">🔍 測試</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Confirm Dialog -->
+<div class="confirm-bg" id="confirmBg">
+  <div class="confirm-box">
+    <div class="cb-icon" id="confirmIcon">⚠️</div>
+    <div class="cb-msg" id="confirmMsg"></div>
+    <div class="cb-actions">
+      <button class="btn" id="confirmNo">取消</button>
+      <button class="btn btn-gold" id="confirmYes">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts (load order matters) -->
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/canvas.js"></script>
+<script src="js/media.js"></script>
+<script src="js/playback.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
